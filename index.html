@@ -2,144 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FraudCanvas AI - Social Commerce Audit</title>
+    <title>FraudCanvas AI</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f4f7f9; font-family: 'Segoe UI', sans-serif; }
-        .header-box { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 12px 30px; position: sticky; top: 0; z-index: 1000; }
-        .sidebar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 20px; }
-        #canvas { height: 750px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
-        
-        /* Search Box */
-        .search-area { position: relative; width: 400px; }
-        #search-id { border-radius: 8px 0 0 8px; border-right: none; }
-        #suggestion-box { 
-            position: absolute; top: 100%; left: 0; width: calc(100% - 95px); 
-            background: #fff; border: 1px solid #e2e8f0; border-top: none; 
-            border-radius: 0 0 8px 8px; display: none; z-index: 2000; box-shadow: 0 8px 16px rgba(0,0,0,0.1); 
-        }
-        .suggest-item { padding: 8px 15px; cursor: pointer; font-size: 13px; }
-        .suggest-item:hover { background: #f0f7ff; color: #0061ff; }
-
-        /* Alerts */
-        .alert-card { padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid; position: relative; font-size: 13px; }
+        .sidebar { background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; }
+        #canvas { height: 700px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .alert-card { padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid; font-size: 13px; }
         .alert-red { background: #fff5f5; border-color: #ff453a; }
+        .alert-purple { background: #f3e5f5; border-color: #af52de; }
         .alert-orange { background: #fffaf0; border-color: #ff9f0a; }
-        .btn-del { position: absolute; top: 5px; right: 8px; color: #ccc; border: none; background: none; }
-
-        .legend { background: #fff; padding: 10px 30px; border-radius: 50px; border: 1px solid #e2e8f0; display: inline-flex; gap: 20px; font-size: 12px; margin-top: 15px; }
+        .legend { background: #fff; padding: 10px 25px; border-radius: 50px; display: inline-flex; gap: 15px; font-size: 12px; margin-top: 10px; border: 1px solid #ddd; }
     </style>
 </head>
-<body>
-
-<div class="header-box d-flex justify-content-between align-items-center">
-    <h4 class="m-0 fw-bold">🛡️ FRAUD<span class="text-primary">CANVAS</span></h4>
-    <div class="search-area d-flex">
-        <input id="search-id" class="form-control" placeholder="Gõ ID để điều tra..." onkeyup="handleSearch(this.value)" autocomplete="off">
-        <div id="suggestion-box"></div>
-        <button class="btn btn-primary px-4 fw-bold" onclick="loadData()">ANALYZE</button>
+<body class="p-4">
+    <div class="d-flex justify-content-between mb-4 bg-white p-3 rounded shadow-sm">
+        <h4 class="m-0 fw-bold">🛡️ FRAUDCANVAS</h4>
+        <div class="d-flex gap-2">
+            <input id="search-id" class="form-control" placeholder="Search ID (S01, C04...)" style="width: 300px;">
+            <button class="btn btn-primary fw-bold" onclick="loadData()">ANALYZE</button>
+        </div>
     </div>
-</div>
 
-<div class="container-fluid p-4">
     <div class="row g-4">
         <div class="col-md-3">
-            <div class="sidebar">
-                <h6 class="fw-bold text-secondary small mb-3">DATA INJECTION</h6>
+            <div class="sidebar mb-4">
+                <h6 class="fw-bold small">DATA INJECTION</h6>
                 <input id="sid" class="form-control form-control-sm mb-2" placeholder="Store ID">
                 <input id="oid" class="form-control form-control-sm mb-2" placeholder="Owner ID">
-                <input id="sip" class="form-control form-control-sm mb-2" placeholder="IP Address">
-                <input id="sdev" class="form-control form-control-sm mb-2" placeholder="Device ID">
-                <button class="btn btn-dark w-100 btn-sm fw-bold" onclick="addStore()">SYNC TO GRAPH</button>
+                <button class="btn btn-dark w-100 btn-sm" onclick="addStore()">SYNC</button>
             </div>
-
-            <div class="sidebar p-0 overflow-hidden">
-                <div class="p-3 bg-light border-bottom"><h6 class="m-0 fw-bold small">FRAUD ALERTS</h6></div>
-                <div id="alert-list" class="p-3" style="max-height: 400px; overflow-y: auto;"></div>
+            <div class="sidebar overflow-auto" style="max-height: 450px;">
+                <h6 class="fw-bold small mb-3">FRAUD ALERTS</h6>
+                <div id="alert-list"></div>
             </div>
         </div>
-
         <div class="col-md-9 text-center">
             <div id="canvas"></div>
             <div class="legend shadow-sm">
                 <span><b style="color: #ff453a;">●</b> Cycle Fraud</span>
-                <span><b style="color: #ff9f0a;">●</b> Community Suspect</span>
+                <span><b style="color: #af52de;">●</b> Self-Buying</span>
+                <span><b style="color: #ff9f0a;">●</b> Community</span>
                 <span><b style="color: #0a84ff;">●</b> Customer</span>
                 <span><b style="color: #32d74b;">●</b> Store</span>
-                <span><b style="color: #8e8e93;">●</b> Infrastructure</span>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-    let network = null;
-    let masterIds = [];
+    <script>
+        let network = null;
+        async function loadData() {
+            const sid = document.getElementById('search-id').value;
+            const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
+            const data = await res.json();
+            const nodes = new vis.DataSet(data.nodes.map(n => ({...n, shape: 'dot', size: 25})));
+            const edges = new vis.DataSet(data.edges.map(e => ({...e, arrows: 'to', color: '#e2e8f0'})));
+            if(network) network.destroy();
+            network = new vis.Network(document.getElementById('canvas'), {nodes, edges}, { physics: { stabilization: true, barnesHut: { gravitationalConstant: -2000 } } });
 
-    async function loadData() {
-        const sid = document.getElementById('search-id').value;
-        const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
-        const data = await res.json();
-
-        masterIds = data.nodes.map(n => n.orig_id);
-        const nodes = new vis.DataSet(data.nodes.map(n => ({...n, shape: 'dot', size: 25})));
-        const edges = new vis.DataSet(data.edges.map(e => ({...e, arrows: 'to', color: '#e2e8f0'})));
-
-        if(network) network.destroy();
-        network = new vis.Network(document.getElementById('canvas'), {nodes, edges}, {
-            physics: { stabilization: true, barnesHut: { gravitationalConstant: -2000 } }
-        });
-
-        // Hiển thị Alert List
-        document.getElementById('alert-list').innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => `
-            <div class="alert-card ${n.status === 'Circular Fraud' ? 'alert-red' : 'alert-orange'}">
-                <div class="fw-bold">${n.orig_id}</div>
-                <div class="text-muted small">${n.status}</div>
-                <button class="btn-del" onclick="deleteNode('${n.orig_id}')">✕</button>
-            </div>
-        `).join('');
-    }
-
-    function handleSearch(val) {
-        const box = document.getElementById('suggestion-box');
-        if(!val) { box.style.display = 'none'; return; }
-        const matches = [...new Set(masterIds)].filter(id => id.toLowerCase().includes(val.toLowerCase()));
-        if(matches.length > 0) {
-            box.innerHTML = matches.map(m => `<div class="suggest-item" onclick="selectId('${m}')">${m}</div>`).join('');
-            box.style.display = 'block';
-        } else { box.style.display = 'none'; }
-    }
-
-    function selectId(id) {
-        document.getElementById('search-id').value = id;
-        document.getElementById('suggestion-box').style.display = 'none';
-        loadData();
-    }
-
-    async function addStore() {
-        const body = {
-            id: document.getElementById('sid').value,
-            name: "Store " + document.getElementById('sid').value,
-            owner_id: document.getElementById('oid').value,
-            ip: document.getElementById('sip').value || "127.0.0.1",
-            device: document.getElementById('sdev').value || "Device_01"
-        };
-        await fetch('http://127.0.0.1:8000/api/add-store', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-        });
-        loadData();
-    }
-
-    async function deleteNode(id) {
-        if(confirm('Xóa node này?')) {
-            await fetch(`http://127.0.0.1:8000/api/delete-node/${id}`, {method: 'DELETE'});
-            loadData();
+            document.getElementById('alert-list').innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => `
+                <div class="alert-card ${n.status === 'Circular Fraud' ? 'alert-red' : (n.status === 'Self-Buying' ? 'alert-purple' : 'alert-orange')}">
+                    <div class="fw-bold">${n.orig_id}</div><div class="small">${n.status}</div>
+                </div>`).join('');
         }
-    }
-
-    window.onload = loadData;
-</script>
+        window.onload = loadData;
+    </script>
 </body>
 </html>
