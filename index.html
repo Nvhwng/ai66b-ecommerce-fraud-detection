@@ -2,42 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FraudCanvas AI</title>
+    <title>FraudCanvas AI - Auto Align Edition</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f4f7f9; font-family: 'Segoe UI', sans-serif; }
-        .sidebar { background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; }
-        #canvas { height: 700px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .header-box { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 12px 30px; position: sticky; top: 0; z-index: 1000; }
+        .sidebar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 20px; }
+        #canvas { height: 750px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
+        
         .alert-card { padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid; font-size: 13px; }
         .alert-red { background: #fff5f5; border-color: #ff453a; }
         .alert-purple { background: #f3e5f5; border-color: #af52de; }
         .alert-orange { background: #fffaf0; border-color: #ff9f0a; }
-        .legend { background: #fff; padding: 10px 25px; border-radius: 50px; display: inline-flex; gap: 15px; font-size: 12px; margin-top: 10px; border: 1px solid #ddd; }
+
+        .legend { background: #fff; padding: 10px 30px; border-radius: 50px; border: 1px solid #e2e8f0; display: inline-flex; gap: 20px; font-size: 12px; margin-top: 15px; }
+        
+        /* Control Switch */
+        .form-switch { display: inline-flex; align-items: center; background: #fff; padding: 5px 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
     </style>
 </head>
-<body class="p-4">
-    <div class="d-flex justify-content-between mb-4 bg-white p-3 rounded shadow-sm">
-        <h4 class="m-0 fw-bold">🛡️ FRAUDCANVAS</h4>
-        <div class="d-flex gap-2">
-            <input id="search-id" class="form-control" placeholder="Search ID (S01, C04...)" style="width: 300px;">
-            <button class="btn btn-primary fw-bold" onclick="loadData()">ANALYZE</button>
-        </div>
-    </div>
+<body>
 
+<div class="header-box d-flex justify-content-between align-items-center">
+    <h4 class="m-0 fw-bold">🛡️ FRAUD<span class="text-primary">CANVAS</span></h4>
+    <div class="d-flex align-items-center gap-3">
+        <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" id="layoutSwitch" onchange="toggleLayout()">
+            <label class="form-check-label ms-2 small fw-bold" for="layoutSwitch">AUTO-ALIGN (Hierarchical)</label>
+        </div>
+        <div class="position-relative">
+            <input id="search-id" class="form-control" placeholder="ID (S01, C04...)" style="width: 250px;">
+        </div>
+        <button class="btn btn-primary px-4 fw-bold" onclick="loadData()">ANALYZE</button>
+    </div>
+</div>
+
+<div class="container-fluid p-4">
     <div class="row g-4">
         <div class="col-md-3">
-            <div class="sidebar mb-4">
-                <h6 class="fw-bold small">DATA INJECTION</h6>
-                <input id="sid" class="form-control form-control-sm mb-2" placeholder="Store ID">
-                <input id="oid" class="form-control form-control-sm mb-2" placeholder="Owner ID">
-                <button class="btn btn-dark w-100 btn-sm" onclick="addStore()">SYNC</button>
-            </div>
-            <div class="sidebar overflow-auto" style="max-height: 450px;">
-                <h6 class="fw-bold small mb-3">FRAUD ALERTS</h6>
+            <div class="sidebar overflow-auto" style="max-height: 800px;">
+                <h6 class="fw-bold text-secondary small mb-3 text-uppercase">Fraud Detection Alerts</h6>
                 <div id="alert-list"></div>
             </div>
         </div>
+
         <div class="col-md-9 text-center">
             <div id="canvas"></div>
             <div class="legend shadow-sm">
@@ -46,27 +55,72 @@
                 <span><b style="color: #ff9f0a;">●</b> Community</span>
                 <span><b style="color: #0a84ff;">●</b> Customer</span>
                 <span><b style="color: #32d74b;">●</b> Store</span>
+                <span><b style="color: #8e8e93;">●</b> Infrastructure</span>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        let network = null;
-        async function loadData() {
-            const sid = document.getElementById('search-id').value;
-            const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
-            const data = await res.json();
-            const nodes = new vis.DataSet(data.nodes.map(n => ({...n, shape: 'dot', size: 25})));
-            const edges = new vis.DataSet(data.edges.map(e => ({...e, arrows: 'to', color: '#e2e8f0'})));
-            if(network) network.destroy();
-            network = new vis.Network(document.getElementById('canvas'), {nodes, edges}, { physics: { stabilization: true, barnesHut: { gravitationalConstant: -2000 } } });
+<script>
+    let network = null;
+    let isHierarchical = false;
 
-            document.getElementById('alert-list').innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => `
-                <div class="alert-card ${n.status === 'Circular Fraud' ? 'alert-red' : (n.status === 'Self-Buying' ? 'alert-purple' : 'alert-orange')}">
-                    <div class="fw-bold">${n.orig_id}</div><div class="small">${n.status}</div>
-                </div>`).join('');
-        }
-        window.onload = loadData;
-    </script>
+    function toggleLayout() {
+        isHierarchical = document.getElementById('layoutSwitch').checked;
+        loadData(); // Reload để áp dụng layout mới
+    }
+
+    async function loadData() {
+        const sid = document.getElementById('search-id').value;
+        const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
+        const data = await res.json();
+
+        const nodes = new vis.DataSet(data.nodes.map(n => ({
+            ...n, 
+            shape: 'dot', 
+            size: 25,
+            // Định nghĩa tầng (level) cho Auto-align dựa trên nhãn node
+            level: n.label.startsWith('IP') || n.label.startsWith('Device') ? 0 : 
+                   (n.label.startsWith('Customer') ? 1 : 2)
+        })));
+
+        const edges = new vis.DataSet(data.edges.map(e => ({
+            ...e, 
+            arrows: 'to', 
+            color: '#e2e8f0',
+            smooth: { type: 'curvedCW', roundness: 0.2 }
+        })));
+
+        const options = {
+            physics: {
+                enabled: !isHierarchical, // Tắt vật lý khi dùng Hierarchical để tránh bị rung
+                barnesHut: { gravitationalConstant: -2000 }
+            },
+            layout: {
+                hierarchical: {
+                    enabled: isHierarchical,
+                    direction: 'UD', // Up-Down (Từ trên xuống)
+                    sortMethod: 'directed',
+                    nodeSpacing: 200,
+                    levelSeparation: 150
+                }
+            },
+            interaction: { hover: true }
+        };
+
+        if(network) network.destroy();
+        network = new vis.Network(document.getElementById('canvas'), {nodes, edges}, options);
+
+        // Render Alerts
+        document.getElementById('alert-list').innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => {
+            let cardClass = "alert-orange";
+            if (n.status === "Circular Fraud") cardClass = "alert-red";
+            if (n.status === "Self-Buying") cardClass = "alert-purple";
+            return `<div class="alert-card ${cardClass}"><div class="fw-bold">${n.orig_id}</div><div class="small">${n.status}</div></div>`;
+        }).join('');
+    }
+
+    window.onload = loadData;
+</script>
 </body>
 </html>
