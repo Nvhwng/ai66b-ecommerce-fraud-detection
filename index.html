@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FraudCanvas AI - Auto Align Edition</title>
+    <title>FraudCanvas AI - Ultimate Edition</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -11,14 +11,15 @@
         .sidebar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); margin-bottom: 20px; }
         #canvas { height: 750px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
         
-        .alert-card { padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid; font-size: 13px; }
+        /* Alerts */
+        .alert-card { padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid; position: relative; font-size: 13px; }
         .alert-red { background: #fff5f5; border-color: #ff453a; }
         .alert-purple { background: #f3e5f5; border-color: #af52de; }
         .alert-orange { background: #fffaf0; border-color: #ff9f0a; }
+        .btn-del { position: absolute; top: 5px; right: 8px; color: #ccc; border: none; background: none; cursor: pointer; }
+        .btn-del:hover { color: #ff453a; }
 
         .legend { background: #fff; padding: 10px 30px; border-radius: 50px; border: 1px solid #e2e8f0; display: inline-flex; gap: 20px; font-size: 12px; margin-top: 15px; }
-        
-        /* Control Switch */
         .form-switch { display: inline-flex; align-items: center; background: #fff; padding: 5px 15px; border-radius: 20px; border: 1px solid #e2e8f0; }
     </style>
 </head>
@@ -29,11 +30,9 @@
     <div class="d-flex align-items-center gap-3">
         <div class="form-check form-switch m-0">
             <input class="form-check-input" type="checkbox" id="layoutSwitch" onchange="toggleLayout()">
-            <label class="form-check-label ms-2 small fw-bold" for="layoutSwitch">AUTO-ALIGN (Hierarchical)</label>
+            <label class="form-check-label ms-2 small fw-bold" for="layoutSwitch">AUTO-ALIGN</label>
         </div>
-        <div class="position-relative">
-            <input id="search-id" class="form-control" placeholder="ID (S01, C04...)" style="width: 250px;">
-        </div>
+        <input id="search-id" class="form-control" placeholder="ID (S01, C01...)" style="width: 200px;">
         <button class="btn btn-primary px-4 fw-bold" onclick="loadData()">ANALYZE</button>
     </div>
 </div>
@@ -41,9 +40,22 @@
 <div class="container-fluid p-4">
     <div class="row g-4">
         <div class="col-md-3">
-            <div class="sidebar overflow-auto" style="max-height: 800px;">
-                <h6 class="fw-bold text-secondary small mb-3 text-uppercase">Fraud Detection Alerts</h6>
-                <div id="alert-list"></div>
+            <div class="sidebar">
+                <h6 class="fw-bold text-secondary small mb-3">DATA INJECTION</h6>
+                <div class="mb-2">
+                    <input id="sid" class="form-control form-control-sm mb-1" placeholder="Store ID (e.g. S99)">
+                    <input id="oid" class="form-control form-control-sm mb-1" placeholder="Owner ID (e.g. C99)">
+                    <input id="sip" class="form-control form-control-sm mb-1" placeholder="IP Address">
+                    <input id="sdev" class="form-control form-control-sm mb-1" placeholder="Device ID">
+                </div>
+                <button class="btn btn-dark w-100 btn-sm fw-bold" onclick="addStore()">SYNC TO GRAPH</button>
+            </div>
+
+            <div class="sidebar p-0 overflow-hidden">
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold small text-uppercase">Fraud Alerts</h6>
+                </div>
+                <div id="alert-list" class="p-3" style="max-height: 450px; overflow-y: auto;"></div>
             </div>
         </div>
 
@@ -67,7 +79,7 @@
 
     function toggleLayout() {
         isHierarchical = document.getElementById('layoutSwitch').checked;
-        loadData(); // Reload để áp dụng layout mới
+        loadData();
     }
 
     async function loadData() {
@@ -79,45 +91,59 @@
             ...n, 
             shape: 'dot', 
             size: 25,
-            // Định nghĩa tầng (level) cho Auto-align dựa trên nhãn node
             level: n.label.startsWith('IP') || n.label.startsWith('Device') ? 0 : 
                    (n.label.startsWith('Customer') ? 1 : 2)
         })));
 
-        const edges = new vis.DataSet(data.edges.map(e => ({
-            ...e, 
-            arrows: 'to', 
-            color: '#e2e8f0',
-            smooth: { type: 'curvedCW', roundness: 0.2 }
-        })));
+        const edges = new vis.DataSet(data.edges.map(e => ({...e, arrows: 'to', color: '#e2e8f0'})));
 
         const options = {
-            physics: {
-                enabled: !isHierarchical, // Tắt vật lý khi dùng Hierarchical để tránh bị rung
-                barnesHut: { gravitationalConstant: -2000 }
-            },
-            layout: {
-                hierarchical: {
-                    enabled: isHierarchical,
-                    direction: 'UD', // Up-Down (Từ trên xuống)
-                    sortMethod: 'directed',
-                    nodeSpacing: 200,
-                    levelSeparation: 150
-                }
-            },
+            physics: { enabled: !isHierarchical, barnesHut: { gravitationalConstant: -2000 } },
+            layout: { hierarchical: { enabled: isHierarchical, direction: 'UD', sortMethod: 'directed', nodeSpacing: 200 } },
             interaction: { hover: true }
         };
 
         if(network) network.destroy();
         network = new vis.Network(document.getElementById('canvas'), {nodes, edges}, options);
 
-        // Render Alerts
-        document.getElementById('alert-list').innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => {
+        // Render Alert List
+        const alertList = document.getElementById('alert-list');
+        alertList.innerHTML = data.nodes.filter(n => n.status !== "Normal").map(n => {
             let cardClass = "alert-orange";
             if (n.status === "Circular Fraud") cardClass = "alert-red";
             if (n.status === "Self-Buying") cardClass = "alert-purple";
-            return `<div class="alert-card ${cardClass}"><div class="fw-bold">${n.orig_id}</div><div class="small">${n.status}</div></div>`;
+            return `
+                <div class="alert-card ${cardClass}">
+                    <div class="fw-bold">${n.orig_id}</div>
+                    <div class="text-muted small">${n.status}</div>
+                    <button class="btn-del" onclick="deleteNode('${n.orig_id}')" title="Xóa Node">✕</button>
+                </div>
+            `;
         }).join('');
+    }
+
+    async function addStore() {
+        const body = {
+            id: document.getElementById('sid').value,
+            name: "Store " + document.getElementById('sid').value,
+            owner_id: document.getElementById('oid').value,
+            ip: document.getElementById('sip').value || "127.0.0.1",
+            device: document.getElementById('sdev').value || "Device_01"
+        };
+        if(!body.id || !body.owner_id) return alert("Nhập Store ID và Owner ID!");
+        
+        await fetch('http://127.0.0.1:8000/api/add-store', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        loadData();
+    }
+
+    async function deleteNode(id) {
+        if(confirm('Xác nhận xóa node ' + id + '?')) {
+            await fetch(`http://127.0.0.1:8000/api/delete-node/${id}`, {method: 'DELETE'});
+            loadData();
+        }
     }
 
     window.onload = loadData;

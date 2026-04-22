@@ -7,7 +7,7 @@
 
 ### 2. Installation
 ```bash
-pip install fastapi uvicorn neo4j pydantic # chạy trong terminal
+pip install fastapi uvicorn neo4j pydantic # chạy terminal
 3. Database Setup
 Cấu hình thông tin kết nối trong database.py:
 
