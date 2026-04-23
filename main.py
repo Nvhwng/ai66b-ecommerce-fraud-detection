@@ -92,3 +92,74 @@ def get_graph(search_id: str = None):
                 edges.append({"from": r.start_node.element_id, "to": r.end_node.element_id, "label": r.type})
             
         return {"nodes": nodes, "edges": edges}
+@app.post("/api/add-store")
+def add_store(store: StoreModel):
+    driver = db_manager.connect()
+    with driver.session() as session:
+        query = """
+        MERGE (c:Customer {id: $owner_id})
+        SET c.name = 'Owner of ' + $id
+        MERGE (s:Store {id: $id})
+        SET s.name = $name
+        MERGE (ip:IP {id: $ip})
+        MERGE (dev:Device {id: $device})
+        
+        // Tạo các mối quan hệ thực thể
+        MERGE (c)-[:OWNS]->(s)
+        MERGE (c)-[:USED_IP]->(ip)
+        MERGE (c)-[:USED_DEVICE]->(dev)
+        
+        // Tùy chọn: Nếu muốn Store mới cũng dùng chung hạ tầng này
+        MERGE (s)-[:USED_IP]->(ip)
+        MERGE (s)-[:USED_DEVICE]->(dev)
+        """
+        session.run(query, 
+            id=store.id, 
+            name=store.name, 
+            owner_id=store.owner_id, 
+            ip=store.ip, 
+            device=store.device
+        )
+        return {"status": "success", "added_id": store.id}
+class PurchaseModel(BaseModel):
+    buyer_id: str
+    store_id: str
+
+class PurchaseModel(BaseModel):
+    buyer_id: str
+    store_id: str
+    ip: str = None  
+    device: str = None 
+
+@app.post("/api/purchase")
+def record_purchase(data: PurchaseModel):
+    driver = db_manager.connect()
+    with driver.session() as session:
+        # 1. Tạo quan hệ mua bán
+        # 2. Nếu có IP/Device mới, nối thêm dây vào Customer đó luôn
+        query = """
+        MATCH (c:Customer {id: $bid})
+        MATCH (s:Store {id: $sid})
+        MERGE (c)-[r:PURCHASED]->(s)
+        SET r.timestamp = datetime()
+        
+        WITH c
+        FOREACH (_ IN CASE WHEN $ip IS NOT NULL THEN [1] ELSE [] END |
+            MERGE (new_ip:IP {id: $ip})
+            MERGE (c)-[:USED_IP]->(new_ip)
+        )
+        FOREACH (_ IN CASE WHEN $dev IS NOT NULL THEN [1] ELSE [] END |
+            MERGE (new_dev:Device {id: $dev})
+            MERGE (c)-[:USED_DEVICE]->(new_dev)
+        )
+        """
+        session.run(query, bid=data.buyer_id, sid=data.store_id, ip=data.ip, dev=data.device)
+        return {"status": "Success"}
+@app.get("/api/suggestions")
+def get_suggestions():
+    driver = db_manager.connect()
+    with driver.session() as session:
+        # Lấy tất cả ID của Store, Customer, IP, Device
+        query = "MATCH (n) RETURN DISTINCT n.id as id"
+        results = session.run(query)
+        return [str(r["id"]) for r in results if r["id"]]
