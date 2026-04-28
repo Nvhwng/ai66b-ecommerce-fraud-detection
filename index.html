@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FraudCanvas AI - Ultimate Pro</title>
+    <title>FraudCanvas AI - Smart Automation</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -11,15 +11,15 @@
         .sidebar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 15px; }
         #canvas { height: 780px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
         
-        /* Cải tiến Search & Suggestions */
+        /* CSS cho Smart Search */
         .search-wrapper { position: relative; width: 100%; }
         .suggestions-list { 
             position: absolute; top: 100%; left: 0; right: 0; 
             background: white; border: 1px solid #ddd; border-radius: 0 0 8px 8px;
-            max-height: 160px; overflow-y: auto; z-index: 2000; display: none;
+            max-height: 150px; overflow-y: auto; z-index: 2000; display: none;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        .suggestion-item { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+        .suggestion-item { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 11px; }
         .suggestion-item:hover { background: #f8f9fa; color: #0a84ff; }
 
         .alert-card { padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #eee; border-left-width: 4px; position: relative; background: #fff; }
@@ -27,7 +27,7 @@
         .alert-purple { border-left-color: #af52de; }
         .alert-orange { border-left-color: #ff9f0a; }
         .alert-normal { border-left-color: #0a84ff; }
-        .btn-del { position: absolute; top: 4px; right: 6px; color: #ccc; border: none; background: none; }
+        .btn-del { position: absolute; top: 4px; right: 6px; color: #ccc; border: none; background: none; font-size: 10px; }
         .btn-del:hover { color: #ff453a; }
         
         .legend { background: #fff; padding: 8px 25px; border-radius: 50px; border: 1px solid #e2e8f0; display: inline-flex; gap: 15px; margin-top: 10px; }
@@ -42,12 +42,10 @@
             <input class="form-check-input" type="checkbox" id="layoutSwitch" onchange="toggleLayout()">
             <label class="form-check-label ms-1 small fw-bold" for="layoutSwitch">AUTO-ALIGN</label>
         </div>
-        
-        <div class="search-wrapper" style="width: 220px;">
+        <div class="search-wrapper" style="width: 200px;">
             <input id="search-id" class="form-control form-control-sm smart-search" placeholder="Analyze ID..." autocomplete="off">
             <div class="suggestions-list"></div>
         </div>
-        
         <button class="btn btn-primary btn-sm px-4 fw-bold" onclick="loadData()">ANALYZE</button>
     </div>
 </div>
@@ -66,22 +64,33 @@
 
             <div class="sidebar shadow-sm">
                 <h6 class="fw-bold text-danger mb-2 small text-uppercase">2. Record Transaction</h6>
+                
                 <div class="search-wrapper mb-1">
-                    <input id="buyer_id" class="form-control form-control-sm smart-search" placeholder="Buyer ID" autocomplete="off">
+                    <input id="buyer_id" class="form-control form-control-sm smart-search" placeholder="Buyer ID (e.g. C01)" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
+                
                 <div class="search-wrapper mb-1">
                     <input id="target_sid" class="form-control form-control-sm smart-search" placeholder="Target Store ID" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
-                <input id="trans_ip" class="form-control form-control-sm mb-1" placeholder="IP for this Trans (Optional)">
-                <input id="trans_dev" class="form-control form-control-sm mb-2" placeholder="Device for this Trans (Optional)">
+
+                <div class="search-wrapper mb-1">
+                    <input id="trans_ip" class="form-control form-control-sm smart-search" placeholder="IP (Select existing or type new)" autocomplete="off">
+                    <div class="suggestions-list"></div>
+                </div>
+
+                <div class="search-wrapper mb-2">
+                    <input id="trans_dev" class="form-control form-control-sm smart-search" placeholder="Device (Select existing or type new)" autocomplete="off">
+                    <div class="suggestions-list"></div>
+                </div>
+
                 <button class="btn btn-outline-danger w-100 btn-sm fw-bold" onclick="recordPurchase()">EXECUTE PURCHASE</button>
             </div>
 
             <div class="sidebar p-0 overflow-hidden shadow-sm">
                 <div class="p-2 bg-light border-bottom fw-bold small text-center">INVESTIGATION LIST</div>
-                <div id="alert-list" class="p-2" style="max-height: 300px; overflow-y: auto;"></div>
+                <div id="alert-list" class="p-2" style="max-height: 250px; overflow-y: auto;"></div>
             </div>
         </div>
 
@@ -103,14 +112,13 @@
     let isHierarchical = false;
     let allEntityIds = [];
 
-    // --- SMART SEARCH ENGINE ---
+    // --- CẬP NHẬT GỢI Ý ---
     async function updateSuggestions() {
-        try {
-            const res = await fetch('http://127.0.0.1:8000/api/suggestions');
-            allEntityIds = await res.json();
-        } catch (e) { console.error(e); }
+        const res = await fetch('http://127.0.0.1:8000/api/suggestions');
+        allEntityIds = await res.json();
     }
 
+    // --- SETUP SMART SEARCH CHO TẤT CẢ Ô CÓ CLASS .smart-search ---
     function setupSmartSearch() {
         document.querySelectorAll('.smart-search').forEach(input => {
             const list = input.nextElementSibling;
@@ -119,16 +127,16 @@
                 const val = e.target.value.toLowerCase();
                 if (!val) { list.style.display = 'none'; return; }
                 const filtered = allEntityIds.filter(id => id.toLowerCase().includes(val));
-                renderList(list, filtered, input);
+                renderSuggestions(list, filtered, input);
             });
 
             input.addEventListener('focus', () => {
-                renderList(list, allEntityIds, input);
+                renderSuggestions(list, allEntityIds, input);
             });
         });
     }
 
-    function renderList(listEl, items, inputEl) {
+    function renderSuggestions(listEl, items, inputEl) {
         if (items.length === 0) { listEl.style.display = 'none'; return; }
         listEl.innerHTML = items.map(id => `<div class="suggestion-item">${id}</div>`).join('');
         listEl.style.display = 'block';
@@ -137,18 +145,19 @@
             item.onclick = () => {
                 inputEl.value = item.innerText;
                 listEl.style.display = 'none';
-                if(inputEl.id === 'search-id') loadData(); // Auto analyze if main search
+                if(inputEl.id === 'search-id') loadData(); 
             };
         });
     }
 
+    // Đóng popup khi click ngoài
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.search-wrapper')) {
             document.querySelectorAll('.suggestions-list').forEach(l => l.style.display = 'none');
         }
     });
 
-    // --- GRAPH LOGIC ---
+    // --- LOAD ĐỒ THỊ ---
     async function loadData() {
         const sid = document.getElementById('search-id').value;
         const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
@@ -176,9 +185,8 @@
             }
         });
 
-        // INVESTIGATION LIST
-        const alertList = document.getElementById('alert-list');
-        alertList.innerHTML = data.nodes.map(n => {
+        // Cập nhật list điều tra
+        document.getElementById('alert-list').innerHTML = data.nodes.map(n => {
             let c = "alert-normal";
             if (n.status === "Circular Fraud") c = "alert-red";
             else if (n.status === "Self-Buying") c = "alert-purple";
@@ -212,6 +220,7 @@
             device: document.getElementById('trans_dev').value || null
         };
         await fetch('http://127.0.0.1:8000/api/purchase', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+        await updateSuggestions(); // Cập nhật nhỡ có IP/Dev mới
         loadData();
     }
 
