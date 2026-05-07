@@ -126,3 +126,14 @@ def delete_node(node_id: str):
     with driver.session() as session:
         session.run("MATCH (n {id: $id}) DETACH DELETE n", id=node_id)
         return {"status": "deleted"}
+
+@app.delete("/api/delete-relationship")
+def delete_relationship(from_id: str, to_id: str, rel_type: str):
+    driver = db_manager.connect()
+    with driver.session() as session:
+        session.run("""
+            MATCH (a {id: $from_id})-[r]->(b {id: $to_id})
+            WHERE type(r) = $rel_type
+            DELETE r
+        """, from_id=from_id, to_id=to_id, rel_type=rel_type)
+        return {"status": "deleted"}

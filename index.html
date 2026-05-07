@@ -172,6 +172,19 @@
             }
         });
 
+        network.on("selectEdge", (p) => {
+            if (p.edges.length > 0 && p.nodes.length === 0) {
+                const edgeId = p.edges[0];
+                const edge = edges.get(edgeId);
+                const fromNode = nodes.get(edge.from);
+                const toNode = nodes.get(edge.to);
+                if (confirm(`Xóa quan hệ [${edge.label}] giữa ${fromNode.orig_id} → ${toNode.orig_id}?`)) {
+                    deleteRelationship(fromNode.orig_id, toNode.orig_id, edge.label);
+                }
+            
+            }
+        });
+
         document.getElementById('alert-list').innerHTML = data.nodes.map(n => {
             let c = n.status === "Circular Fraud" ? "alert-red" : (n.status === "Self-Buying" ? "alert-purple" : (n.status === "Community Suspect" ? "alert-orange" : "alert-normal"));
             return `<div class="alert-card ${c}">
@@ -210,6 +223,11 @@
             await fetch(`http://127.0.0.1:8000/api/delete-node/${id}`, {method: 'DELETE'});
             loadData();
         }
+    }
+
+    async function deleteRelationship(fromId, toId, relType) {
+        await fetch(`http://127.0.0.1:8000/api/delete-relationship?from_id=${fromId}&to_id=${toId}&rel_type=${relType}`, {method: 'DELETE'});
+        loadData();
     }
 
     function toggleLayout() { isHierarchical = document.getElementById('layoutSwitch').checked; loadData(); }
