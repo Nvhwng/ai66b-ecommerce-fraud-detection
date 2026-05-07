@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# --- Models ---
 class StoreModel(BaseModel):
     id: str
     name: str
@@ -19,53 +20,67 @@ class PurchaseModel(BaseModel):
     ip: str = None  
     device: str = None 
 
+# --- Phân tích đồ thị và phát hiện gian lận ---
 @app.get("/api/graph")
 def get_graph(search_id: str = None):
     driver = db_manager.connect()
     with driver.session() as session:
-        # Thuật toán phát hiện Fraud (Giữ nguyên logic cũ của ông)
-        cycle_q = "MATCH path = (n)-[:PURCHASED|OWNS*3..8]-(n) UNWIND nodes(path) as nodes RETURN DISTINCT nodes.id as id"
+        
+        # 1. Thuật toán quét hành vi bất thường
+        cycle_q = "MATCH (n) WHERE (n)-[:PURCHASED|OWNS*3..8]-(n) RETURN DISTINCT n.id as id"
         cycle_ids = {str(r["id"]) for r in session.run(cycle_q)}
 
         self_buying_q = """
         MATCH (c:Customer)-[:PURCHASED]->(s:Store)
-        MATCH (c)-[:USED_IP|USED_DEVICE|OWNS]-(infra)-[:USED_IP|USED_DEVICE|OWNS]-(s)
+        WHERE (c)-[:USED_IP|USED_DEVICE|OWNS*1..2]-(s)
         RETURN DISTINCT c.id as cid, s.id as sid
         """
         self_buying_res = session.run(self_buying_q)
         self_buying_ids = set()
         for r in self_buying_res:
-            self_buying_ids.add(str(r['cid'])); self_buying_ids.add(str(r['sid']))
+            self_buying_ids.update([str(r['cid']), str(r['sid'])])
 
-        community_q = "MATCH (c1:Customer)-[:USED_IP|USED_DEVICE]->(i)<-[:USED_IP|USED_DEVICE]-(c2) WHERE c1 <> c2 RETURN DISTINCT c1.id as id"
+        community_q = """
+        MATCH (n)-[:USED_IP|USED_DEVICE]->()<-[:USED_IP|USED_DEVICE]-(m)
+        WHERE n <> m AND NOT (n:Customer AND m:Store AND (n)-[:PURCHASED]->(m))
+        RETURN DISTINCT n.id as id
+        """
         community_ids = {str(r["id"]) for r in session.run(community_q)}
 
-        if search_id:
-            results = session.run("MATCH (n)-[r*1..2]-(m) WHERE n.id = $sid RETURN n, r, m LIMIT 300", sid=search_id)
-        else:
-            results = session.run("MATCH (n)-[r]-(m) RETURN n, r, m LIMIT 600")
+        # 2. Truy vấn dữ liệu hiển thị
+        query = "MATCH (n)-[r*1..2]-(m) WHERE n.id = $sid RETURN n, r, m LIMIT 300" if search_id \
+                else "MATCH (n)-[r]-(m) RETURN n, r, m LIMIT 600"
+        results = session.run(query, sid=search_id) if search_id else session.run(query)
         
+        # 3. Xử lý Node và Edge cho Frontend
         nodes, edges, node_ids = [], [], set()
         for record in results:
-            for node in [record['n'], record['m']]:
+            for key in ['n', 'm']:
+                node = record[key]
                 e_id = node.element_id
                 if e_id not in node_ids:
                     label = list(node.labels)[0]
-                    orig_id = str(node.get('id') or "")
+                    orig_id = str(node.get('id', ""))
+                    
                     color, status = "#0a84ff", "Normal"
                     if label == "Store": color = "#32d74b"
-                    if label in ["IP", "Device"]: color = "#8e8e93"
+                    elif label in ["IP", "Device"]: color = "#8e8e93"
+                    
                     if orig_id in cycle_ids: color, status = "#ff453a", "Circular Fraud"
                     elif orig_id in self_buying_ids: color, status = "#af52de", "Self-Buying"
                     elif orig_id in community_ids: color, status = "#ff9f0a", "Community Suspect"
+                        
                     nodes.append({"id": e_id, "label": f"{label}:{orig_id}", "color": color, "orig_id": orig_id, "status": status})
                     node_ids.add(e_id)
-            rel = record['r']
-            rels = rel if isinstance(rel, list) else [rel]
+            
+            rel_data = record['r']
+            rels = rel_data if isinstance(rel_data, list) else [rel_data]
             for r in rels:
                 edges.append({"from": r.start_node.element_id, "to": r.end_node.element_id, "label": r.type})
+                
         return {"nodes": nodes, "edges": edges}
 
+# --- Nghiệp vụ Database ---
 @app.post("/api/add-store")
 def add_store(store: StoreModel):
     driver = db_manager.connect()
@@ -97,12 +112,14 @@ def record_purchase(data: PurchaseModel):
         session.run(query, bid=data.buyer_id, sid=data.store_id, ip=data.ip, dev=data.device)
         return {"status": "Success"}
 
+# --- Tiện ích ---
 @app.get("/api/suggestions")
-def get_suggestions():
+def get_suggestions(label: str = None):
     driver = db_manager.connect()
     with driver.session() as session:
-        return [str(r["id"]) for r in session.run("MATCH (n) RETURN DISTINCT n.id as id") if r["id"]]
-
+        query = f"MATCH (n:{label}) RETURN DISTINCT n.id as id" if label \
+                else "MATCH (n) RETURN DISTINCT n.id as id"
+        return [str(r["id"]) for r in session.run(query) if r["id"]]
 @app.delete("/api/delete-node/{node_id}")
 def delete_node(node_id: str):
     driver = db_manager.connect()

@@ -2,16 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FraudCanvas AI - Smart Automation</title>
+    <title>FraudCanvas AI</title>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f4f7f9; font-family: 'Segoe UI', sans-serif; font-size: 13px; }
         .header-box { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 30px; position: sticky; top: 0; z-index: 1000; }
         .sidebar { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 15px; }
-        #canvas { height: 780px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
-        
-        /* CSS cho Smart Search */
+        #canvas { height: 750px; width: 100%; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; }
         .search-wrapper { position: relative; width: 100%; }
         .suggestions-list { 
             position: absolute; top: 100%; left: 0; right: 0; 
@@ -21,7 +19,6 @@
         }
         .suggestion-item { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 11px; }
         .suggestion-item:hover { background: #f8f9fa; color: #0a84ff; }
-
         .alert-card { padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #eee; border-left-width: 4px; position: relative; background: #fff; }
         .alert-red { border-left-color: #ff453a; }
         .alert-purple { border-left-color: #af52de; }
@@ -29,7 +26,6 @@
         .alert-normal { border-left-color: #0a84ff; }
         .btn-del { position: absolute; top: 4px; right: 6px; color: #ccc; border: none; background: none; font-size: 10px; }
         .btn-del:hover { color: #ff453a; }
-        
         .legend { background: #fff; padding: 8px 25px; border-radius: 50px; border: 1px solid #e2e8f0; display: inline-flex; gap: 15px; margin-top: 10px; }
     </style>
 </head>
@@ -43,7 +39,7 @@
             <label class="form-check-label ms-1 small fw-bold" for="layoutSwitch">AUTO-ALIGN</label>
         </div>
         <div class="search-wrapper" style="width: 200px;">
-            <input id="search-id" class="form-control form-control-sm smart-search" placeholder="Analyze ID..." autocomplete="off">
+            <input id="search-id" class="form-control form-control-sm smart-search" data-label="" placeholder="Analyze ID..." autocomplete="off">
             <div class="suggestions-list"></div>
         </div>
         <button class="btn btn-primary btn-sm px-4 fw-bold" onclick="loadData()">ANALYZE</button>
@@ -64,27 +60,22 @@
 
             <div class="sidebar shadow-sm">
                 <h6 class="fw-bold text-danger mb-2 small text-uppercase">2. Record Transaction</h6>
-                
                 <div class="search-wrapper mb-1">
-                    <input id="buyer_id" class="form-control form-control-sm smart-search" placeholder="Buyer ID (e.g. C01)" autocomplete="off">
+                    <input id="buyer_id" class="form-control form-control-sm smart-search" data-label="Customer" placeholder="Buyer ID" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
-                
                 <div class="search-wrapper mb-1">
-                    <input id="target_sid" class="form-control form-control-sm smart-search" placeholder="Target Store ID" autocomplete="off">
+                    <input id="target_sid" class="form-control form-control-sm smart-search" data-label="Store" placeholder="Target Store ID" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
-
                 <div class="search-wrapper mb-1">
-                    <input id="trans_ip" class="form-control form-control-sm smart-search" placeholder="IP (Select existing or type new)" autocomplete="off">
+                    <input id="trans_ip" class="form-control form-control-sm smart-search" data-label="IP" placeholder="IP Address" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
-
                 <div class="search-wrapper mb-2">
-                    <input id="trans_dev" class="form-control form-control-sm smart-search" placeholder="Device (Select existing or type new)" autocomplete="off">
+                    <input id="trans_dev" class="form-control form-control-sm smart-search" data-label="Device" placeholder="Device ID" autocomplete="off">
                     <div class="suggestions-list"></div>
                 </div>
-
                 <button class="btn btn-outline-danger w-100 btn-sm fw-bold" onclick="recordPurchase()">EXECUTE PURCHASE</button>
             </div>
 
@@ -110,37 +101,36 @@
 <script>
     let network = null;
     let isHierarchical = false;
-    let allEntityIds = [];
 
-    // --- CẬP NHẬT GỢI Ý ---
-    async function updateSuggestions() {
-        const res = await fetch('http://127.0.0.1:8000/api/suggestions');
-        allEntityIds = await res.json();
+    async function getSuggestions(label = "") {
+        const url = label ? `http://127.0.0.1:8000/api/suggestions?label=${label}` : 'http://127.0.0.1:8000/api/suggestions';
+        const res = await fetch(url);
+        return await res.json();
     }
 
-    // --- SETUP SMART SEARCH CHO TẤT CẢ Ô CÓ CLASS .smart-search ---
     function setupSmartSearch() {
         document.querySelectorAll('.smart-search').forEach(input => {
             const list = input.nextElementSibling;
+            const label = input.getAttribute('data-label');
 
-            input.addEventListener('input', (e) => {
+            input.addEventListener('input', async (e) => {
                 const val = e.target.value.toLowerCase();
-                if (!val) { list.style.display = 'none'; return; }
-                const filtered = allEntityIds.filter(id => id.toLowerCase().includes(val));
+                const allIds = await getSuggestions(label);
+                const filtered = allIds.filter(id => id.toLowerCase().includes(val));
                 renderSuggestions(list, filtered, input);
             });
 
-            input.addEventListener('focus', () => {
-                renderSuggestions(list, allEntityIds, input);
+            input.addEventListener('focus', async () => {
+                const allIds = await getSuggestions(label);
+                renderSuggestions(list, allIds, input);
             });
         });
     }
 
     function renderSuggestions(listEl, items, inputEl) {
-        if (items.length === 0) { listEl.style.display = 'none'; return; }
+        if (!items.length) { listEl.style.display = 'none'; return; }
         listEl.innerHTML = items.map(id => `<div class="suggestion-item">${id}</div>`).join('');
         listEl.style.display = 'block';
-
         listEl.querySelectorAll('.suggestion-item').forEach(item => {
             item.onclick = () => {
                 inputEl.value = item.innerText;
@@ -150,14 +140,12 @@
         });
     }
 
-    // Đóng popup khi click ngoài
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.search-wrapper')) {
             document.querySelectorAll('.suggestions-list').forEach(l => l.style.display = 'none');
         }
     });
 
-    // --- LOAD ĐỒ THỊ ---
     async function loadData() {
         const sid = document.getElementById('search-id').value;
         const res = await fetch(sid ? `http://127.0.0.1:8000/api/graph?search_id=${sid}` : 'http://127.0.0.1:8000/api/graph');
@@ -179,18 +167,13 @@
 
         network.on("doubleClick", (p) => {
             if (p.nodes.length > 0) {
-                const id = nodes.get(p.nodes[0]).orig_id;
-                document.getElementById('search-id').value = id;
+                document.getElementById('search-id').value = nodes.get(p.nodes[0]).orig_id;
                 loadData();
             }
         });
 
-        // Cập nhật list điều tra
         document.getElementById('alert-list').innerHTML = data.nodes.map(n => {
-            let c = "alert-normal";
-            if (n.status === "Circular Fraud") c = "alert-red";
-            else if (n.status === "Self-Buying") c = "alert-purple";
-            else if (n.status === "Community Suspect") c = "alert-orange";
+            let c = n.status === "Circular Fraud" ? "alert-red" : (n.status === "Self-Buying" ? "alert-purple" : (n.status === "Community Suspect" ? "alert-orange" : "alert-normal"));
             return `<div class="alert-card ${c}">
                 <div class="fw-bold">${n.orig_id}</div><div class="small text-muted">${n.status}</div>
                 <button class="btn-del" onclick="deleteNode('${n.orig_id}')">✕</button>
@@ -207,7 +190,6 @@
             device: document.getElementById('sdev_inj').value || "Device_01"
         };
         await fetch('http://127.0.0.1:8000/api/add-store', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        await updateSuggestions();
         document.getElementById('search-id').value = body.id;
         loadData();
     }
@@ -220,25 +202,19 @@
             device: document.getElementById('trans_dev').value || null
         };
         await fetch('http://127.0.0.1:8000/api/purchase', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-        await updateSuggestions(); // Cập nhật nhỡ có IP/Dev mới
         loadData();
     }
 
     async function deleteNode(id) {
         if(confirm(`Delete ${id}?`)) {
             await fetch(`http://127.0.0.1:8000/api/delete-node/${id}`, {method: 'DELETE'});
-            await updateSuggestions();
             loadData();
         }
     }
 
     function toggleLayout() { isHierarchical = document.getElementById('layoutSwitch').checked; loadData(); }
 
-    window.onload = async () => { 
-        await updateSuggestions(); 
-        setupSmartSearch();
-        loadData(); 
-    };
+    window.onload = () => { setupSmartSearch(); loadData(); };
 </script>
 </body>
 </html>
