@@ -71,5 +71,5 @@ Sử dụng thanh **Search** trên giao diện để kiểm tra các Node đặc
 | ID | Loại hình gian lận | Trạng thái hiển thị |
 |:---:|---|---|
 | `S01` | Circular Trading | 🔴 Màu Đỏ — High Risk |
-| `C04` | Shared Infrastructure | 🟠 Màu Cam — Suspect |
+| `C05` | Shared Infrastructure | 🟠 Màu Cam — Suspect |
 | `S05` | Normal Transaction | 🔵 Màu Xanh — Safe |
